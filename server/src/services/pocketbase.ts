@@ -11,17 +11,17 @@ let isAuthenticated = false
 
 export async function initPocketBase(): Promise<void> {
   try {
-    await pb.admins.authWithPassword(ADMIN_EMAIL, ADMIN_PASSWORD)
+    await pb.collection("_superusers").authWithPassword(ADMIN_EMAIL, ADMIN_PASSWORD)
     isAuthenticated = true
     console.log('[PocketBase] Admin authenticated successfully')
 
     // Auto-refresh token
     setInterval(async () => {
       try {
-        await pb.admins.authRefresh()
+        await pb.collection("_superusers").authRefresh()
       } catch {
         try {
-          await pb.admins.authWithPassword(ADMIN_EMAIL, ADMIN_PASSWORD)
+          await pb.collection("_superusers").authWithPassword(ADMIN_EMAIL, ADMIN_PASSWORD)
         } catch (err) {
           console.error('[PocketBase] Re-auth failed:', err)
         }
