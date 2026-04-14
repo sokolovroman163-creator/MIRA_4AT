@@ -57,12 +57,12 @@ mkdir pb_server
 cd pb_server
 
 # Скачиваем официальный бинарный файл для Linux (x64)
-wget https://github.com/pocketbase/pocketbase/releases/download/v0.26.8/pocketbase_0.26.8_linux_amd64.zip
+wget https://github.com/pocketbase/pocketbase/releases/download/v0.26.6/pocketbase_0.26.6_linux_amd64.zip
 
 # Распаковываем (если нет unzip: sudo apt install unzip)
 sudo apt install unzip
-unzip pocketbase_0.26.8_linux_amd64.zip
-rm pocketbase_0.26.8_linux_amd64.zip
+unzip pocketbase_0.26.6_linux_amd64.zip
+rm pocketbase_0.26.6_linux_amd64.zip
 
 # Запускаем один раз для проверки
 ./pocketbase serve --http="127.0.0.1:8090"
