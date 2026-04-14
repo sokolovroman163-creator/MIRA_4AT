@@ -50,8 +50,9 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
 
       const message = await pb.collection('messages').create(formData)
 
-      // Get file URL from PocketBase
-      const fileUrl = pb.files.getUrl(message, message.file as string)
+      // Get file URL from PocketBase and make it relative
+      const pbUrl = new URL(pb.files.getURL(message, message.file as string))
+      const fileUrl = pbUrl.pathname + pbUrl.search
 
       // Get sender info
       const sender = await pb.collection('users').getOne(userId)
@@ -159,7 +160,8 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
       formData.append('file', blob, fileName)
 
       const message = await pb.collection('messages').create(formData)
-      const fileUrl = pb.files.getUrl(message, message.file as string)
+      const pbUrl = new URL(pb.files.getURL(message, message.file as string))
+      const fileUrl = pbUrl.pathname + pbUrl.search
       const sender = await pb.collection('users').getOne(userId)
 
       const messagePayload = {
@@ -270,7 +272,8 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
         // Build file URL from PocketBase file field, fallback to text fileUrl field
         let fileUrl = msg.fileUrl as string || ''
         if (msg.file) {
-          fileUrl = pb.files.getUrl(msg, msg.file as string)
+          const pbUrl = new URL(pb.files.getURL(msg, msg.file as string))
+          fileUrl = pbUrl.pathname + pbUrl.search
         }
 
         return {

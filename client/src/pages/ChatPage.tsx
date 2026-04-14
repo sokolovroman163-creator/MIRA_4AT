@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback, useMemo, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence } from 'framer-motion'
 import { isSameDay } from 'date-fns'
@@ -32,7 +32,10 @@ export default function ChatPage() {
   const { addToQueue } = useOfflineStore()
 
   const { user: currentUser } = useAuthStore()
-  const { chats, setActiveChat, clearUnread } = useChatStore()
+  const { chats, setActiveChat, clearUnread, deleteChat } = useChatStore()
+  const navigate = useNavigate()
+  const [showChatMenu, setShowChatMenu] = useState(false)
+  const [deletingChat, setDeletingChat] = useState(false)
   
   // Narrow selectors to specific chatId — avoids re-renders from other chats
   const messages = useMessageStore(s => (chatId ? s.messages[chatId] : undefined)) ?? EMPTY_MESSAGES
@@ -282,8 +285,27 @@ export default function ChatPage() {
     [forwardingMessage, currentUser]
   )
 
+  // ─── Delete / Leave chat ──────────────────────────────────
+  const handleDeleteChat = useCallback(async () => {
+    if (!chatId || deletingChat) return
+    const chatIsGroup = chat?.type === 'group'
+    const confirmMsg = chatIsGroup
+      ? t('chats.confirmLeaveGroup', { defaultValue: 'Покинуть группу?' })
+      : t('chats.confirmDeleteChat', { defaultValue: 'Удалить этот чат?' })
+    if (!window.confirm(confirmMsg)) return
+    setDeletingChat(true)
+    setShowChatMenu(false)
+    try {
+      await deleteChat(chatId)
+      navigate('/', { replace: true })
+    } catch {
+      setDeletingChat(false)
+    }
+  }, [chatId, deletingChat, chat?.type, t, deleteChat, navigate])
+
   // ─── Send text message (with reply/edit support) ──────────
   const handleSend = useCallback(
+
     async (text: string) => {
       if (!chatId || !currentUser) return
 
@@ -565,6 +587,70 @@ export default function ChatPage() {
           avatarName={chatTitle}
           isOnline={chatIsOnline}
           isTyping={isTyping}
+          rightActions={
+            <div style={{ position: 'relative' }}>
+              <motion.button
+                whileTap={{ scale: 0.88 }}
+                onClick={() => setShowChatMenu(v => !v)}
+                style={{
+                  width: 44, height: 44, borderRadius: 22,
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+                aria-label="Меню чата"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="5" r="1.3" fill="var(--text-secondary)"/>
+                  <circle cx="12" cy="12" r="1.3" fill="var(--text-secondary)"/>
+                  <circle cx="12" cy="19" r="1.3" fill="var(--text-secondary)"/>
+                </svg>
+              </motion.button>
+              <AnimatePresence>
+                {showChatMenu && (
+                  <>
+                    <div
+                      style={{ position: 'fixed', inset: 0, zIndex: 299 }}
+                      onClick={() => setShowChatMenu(false)}
+                    />
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.9, y: -4 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.9, y: -4 }}
+                      transition={{ duration: 0.15 }}
+                      style={{
+                        position: 'absolute', top: 48, right: 4,
+                        background: 'var(--bg-secondary)',
+                        border: '1px solid var(--separator)',
+                        borderRadius: 14, overflow: 'hidden',
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+                        zIndex: 300, minWidth: 200,
+                      }}
+                    >
+                      <button
+                        onClick={handleDeleteChat}
+                        disabled={deletingChat}
+                        style={{
+                          width: '100%', padding: '14px 16px',
+                          background: 'none', border: 'none',
+                          cursor: 'pointer', textAlign: 'left',
+                          color: '#FF3B30', fontSize: 15, fontWeight: 500,
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          fontFamily: 'inherit',
+                        }}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                          <polyline points="3 6 5 6 21 6" stroke="#FF3B30" strokeWidth="1.8" strokeLinecap="round"/>
+                          <path d="M19 6l-1 14H6L5 6" stroke="#FF3B30" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M10 11v6M14 11v6" stroke="#FF3B30" strokeWidth="1.8" strokeLinecap="round"/>
+                        </svg>
+                        {isGroup ? 'Покинуть группу' : 'Удалить чат'}
+                      </button>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
+          }
         />
       )}
 
@@ -573,9 +659,11 @@ export default function ChatPage() {
         <div
           className="flex items-center gap-3 no-select"
           style={{
+            position: 'relative',
+            zIndex: 50,
             height: 'var(--nav-height)',
             paddingLeft: 16,
-            paddingRight: 16,
+            paddingRight: 8,
             borderBottom: '1px solid var(--separator)',
             flexShrink: 0,
             background: 'var(--glass)',
@@ -611,6 +699,69 @@ export default function ChatPage() {
                 ? `${chat.members.length} ${t('chats.members')}`
                 : null}
             </div>
+          </div>
+          {/* ⋮ menu for desktop */}
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <motion.button
+              whileTap={{ scale: 0.88 }}
+              onClick={() => setShowChatMenu(v => !v)}
+              style={{
+                width: 36, height: 36, borderRadius: 18,
+                background: 'none', border: 'none', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+              aria-label="Меню чата"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="5" r="1.3" fill="var(--text-secondary)"/>
+                <circle cx="12" cy="12" r="1.3" fill="var(--text-secondary)"/>
+                <circle cx="12" cy="19" r="1.3" fill="var(--text-secondary)"/>
+              </svg>
+            </motion.button>
+            <AnimatePresence>
+              {showChatMenu && (
+                <>
+                  <div
+                    style={{ position: 'fixed', inset: 0, zIndex: 299 }}
+                    onClick={() => setShowChatMenu(false)}
+                  />
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9, y: -4 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.9, y: -4 }}
+                    transition={{ duration: 0.15 }}
+                    style={{
+                      position: 'absolute', top: 44, right: 0,
+                      background: 'var(--bg-secondary)',
+                      border: '1px solid var(--separator)',
+                      borderRadius: 14, overflow: 'hidden',
+                      boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+                      zIndex: 300, minWidth: 200,
+                    }}
+                  >
+                    <button
+                      onClick={handleDeleteChat}
+                      disabled={deletingChat}
+                      style={{
+                        width: '100%', padding: '14px 16px',
+                        background: 'none', border: 'none',
+                        cursor: 'pointer', textAlign: 'left',
+                        color: '#FF3B30', fontSize: 15, fontWeight: 500,
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                        <polyline points="3 6 5 6 21 6" stroke="#FF3B30" strokeWidth="1.8" strokeLinecap="round"/>
+                        <path d="M19 6l-1 14H6L5 6" stroke="#FF3B30" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M10 11v6M14 11v6" stroke="#FF3B30" strokeWidth="1.8" strokeLinecap="round"/>
+                      </svg>
+                      {isGroup ? 'Покинуть группу' : 'Удалить чат'}
+                    </button>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       )}

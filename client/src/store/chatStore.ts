@@ -20,6 +20,7 @@ interface ChatState {
   incrementUnread: (chatId: string) => void
   clearUnread: (chatId: string) => void
   updateUserPresence: (userId: string, isOnline: boolean, lastSeen?: string) => void
+  deleteChat: (chatId: string) => Promise<void>
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -156,6 +157,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
           ),
         }
       }),
+    }))
+  },
+
+  // Leave or delete a chat/group
+  deleteChat: async (chatId) => {
+    await api.delete(`/api/chats/${chatId}`)
+    // Remove from local state immediately
+    set(state => ({
+      chats: state.chats.filter(c => c.id !== chatId),
+      activeChat: state.activeChat?.id === chatId ? null : state.activeChat,
     }))
   },
 }))

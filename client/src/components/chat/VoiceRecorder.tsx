@@ -86,6 +86,12 @@ export default function VoiceRecorder({ onSend, disabled }: Props) {
       return
     }
 
+    // Check if the user already lifted their finger while waiting for permission
+    if (!pointerDownRef.current) {
+      stream.getTracks().forEach(t => t.stop())
+      return
+    }
+
     chunksRef.current = []
     const mr = new MediaRecorder(stream, { mimeType: getSupportedMimeType() })
     mediaRecorderRef.current = mr
@@ -98,12 +104,17 @@ export default function VoiceRecorder({ onSend, disabled }: Props) {
       stream.getTracks().forEach(t => t.stop())
       if (isCancelledRef.current) return
       const blob = new Blob(chunksRef.current, { type: mr.mimeType })
-      const dur = startTimeRef.current // we stored duration here
+      
+      // Calculate duration safely here as well in case it wasn't captured
+      let dur = startTimeRef.current
+      if (dur > 10000) {
+        dur = Math.round((Date.now() - dur) / 1000)
+      }
       onSend(blob, Math.max(1, dur))
     }
 
     startTimeRef.current = Date.now()
-    mr.start(200) // collect every 200ms
+    mr.start() // Record everything into a single chunk safely
     setRecording(true)
     setElapsed(0)
 
@@ -116,10 +127,13 @@ export default function VoiceRecorder({ onSend, disabled }: Props) {
     }, 500)
   }, [disabled, recording, onSend, doSend, t])
 
+  const pointerDownRef = useRef(false)
+
   // pointer events on the mic button
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       startPointerXRef.current = e.clientX
+      pointerDownRef.current = true
       ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
       startRecording()
     },
@@ -139,6 +153,7 @@ export default function VoiceRecorder({ onSend, disabled }: Props) {
   )
 
   const handlePointerUp = useCallback(() => {
+    pointerDownRef.current = false
     if (!recording) return
     doSend()
   }, [recording, doSend])
@@ -146,6 +161,7 @@ export default function VoiceRecorder({ onSend, disabled }: Props) {
   // cleanup on unmount
   useEffect(() => {
     return () => {
+      pointerDownRef.current = false
       isCancelledRef.current = true
       mediaRecorderRef.current?.stop()
       stopTimer()

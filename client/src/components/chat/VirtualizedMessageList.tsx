@@ -104,37 +104,65 @@ export default function VirtualizedMessageList({
 }: VirtualizedMessageListProps) {
   const listRef = useListRef(null)
   const prevItemsLengthRef = useRef(0)
+  // Track whether the user is near the bottom so we can auto-scroll
+  const isNearBottomRef = useRef(true)
 
   const dynamicRowHeight = useDynamicRowHeight({
     defaultRowHeight: DEFAULT_ROW_HEIGHT,
-    key: items.length, // reset measurements when items change drastically
+    key: items.length,
   })
 
-  // Scroll to bottom on initial load & new messages at the end
+  const scrollToBottom = useCallback(() => {
+    if (items.length === 0) return
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToRow({ index: items.length - 1, align: 'end' })
+      // Second call after dynamic heights settle
+      setTimeout(() => {
+        listRef.current?.scrollToRow({ index: items.length - 1, align: 'end' })
+      }, 80)
+    })
+  }, [items.length, listRef])
+
+  // Scroll to bottom on initial load & new messages
   useEffect(() => {
     const prevLen = prevItemsLengthRef.current
     prevItemsLengthRef.current = items.length
 
     if (items.length === 0) return
 
-    // New messages added at end (not history prepend)
-    if (items.length > prevLen && prevLen > 0) {
-      const lastItem = items[items.length - 1]
-      if (lastItem.kind === 'message') {
-        // Only auto-scroll if it's our own message
-        if (lastItem.message.senderId === currentUserId) {
-          requestAnimationFrame(() => {
-            listRef.current?.scrollToRow({ index: items.length - 1, align: 'end' })
-          })
-        }
-      }
-    } else if (prevLen === 0 && items.length > 0) {
-      // Initial load — scroll to bottom
-      requestAnimationFrame(() => {
-        listRef.current?.scrollToRow({ index: items.length - 1, align: 'end' })
-      })
+    if (prevLen === 0 && items.length > 0) {
+      // Initial load — always scroll to bottom
+      scrollToBottom()
+      return
     }
-  }, [items.length, currentUserId, items, listRef])
+
+    // New message(s) appended at the end (not history prepend)
+    if (items.length > prevLen) {
+      const newCount = items.length - prevLen
+      // Only auto-scroll for 1–3 new messages at a time (not bulk history loads)
+      if (newCount > 5) return
+
+      const lastItem = items[items.length - 1]
+      if (lastItem.kind !== 'message') return
+
+      const isOwn = lastItem.message.senderId === currentUserId
+
+      // Always scroll if it's our own message OR user was already near bottom
+      if (isOwn || isNearBottomRef.current) {
+        scrollToBottom()
+      }
+    }
+  }, [items.length, currentUserId, items, scrollToBottom])
+
+  // Intercept native scroll to track if user is near the bottom
+  const handleScrollNative = useCallback(
+    (e: React.UIEvent<HTMLDivElement>) => {
+      const el = e.currentTarget
+      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+      isNearBottomRef.current = distanceFromBottom < 120
+    },
+    []
+  )
 
   // Handle visible rows change for load more (when near top)
   const handleRowsRendered = useCallback(
@@ -158,9 +186,10 @@ export default function VirtualizedMessageList({
       listRef={listRef}
       rowCount={items.length}
       rowHeight={dynamicRowHeight}
-      rowComponent={Row as ListProps<RowProps>["rowComponent"]}
+      rowComponent={Row as ListProps<RowProps>['rowComponent']}
       rowProps={rowProps}
       onRowsRendered={handleRowsRendered}
+      onScroll={handleScrollNative}
       overscanCount={8}
       style={{
         height,

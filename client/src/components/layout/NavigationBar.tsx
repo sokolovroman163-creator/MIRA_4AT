@@ -36,12 +36,13 @@ export default function NavigationBar({
     <header
       className="flex items-center gap-2 no-select"
       style={{
+        position: 'relative',
+        zIndex: 10,
         height: `calc(var(--nav-height) + env(safe-area-inset-top))`,
         paddingTop: 'env(safe-area-inset-top)',
         paddingLeft: 4,
         paddingRight: 4,
         flexShrink: 0,
-        zIndex: 10,
         background: 'var(--glass)',
         backdropFilter: 'blur(20px) saturate(180%)',
         WebkitBackdropFilter: 'blur(20px) saturate(180%)',

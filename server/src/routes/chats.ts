@@ -247,4 +247,61 @@ export async function chatRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(404).send({ error: 'Chat not found' })
     }
   })
+
+  // DELETE /api/chats/:id — leave or delete a chat
+  app.delete('/api/chats/:id', { preHandler: verifyJWT }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const { userId } = request.user as { userId: string }
+    const { id } = request.params as { id: string }
+    const pb = getPB()
+
+    try {
+      const chat = await pb.collection('chats').getOne(id)
+
+      // Verify membership
+      const membership = await pb.collection('chatMembers').getFirstListItem(
+        `chatId = "${id}" && userId = "${userId}"`
+      )
+      if (!membership) {
+        return reply.status(403).send({ error: 'Not a member' })
+      }
+
+      if (chat.type === 'direct') {
+        // Hard delete of personal chat — remove both members and all messages
+        // PocketBase cascadeDelete handles messages via chatId relation in schema
+        await pb.collection('chats').delete(id)
+        return reply.send({ ok: true, deleted: true })
+      }
+
+      // Group chat — remove the member record (leave)
+      await pb.collection('chatMembers').delete(membership.id)
+
+      // Check if there are remaining members
+      const remaining = await pb.collection('chatMembers').getList(1, 1, {
+        filter: `chatId = "${id}"`,
+      })
+
+      if (remaining.totalItems === 0) {
+        // Last person left — delete the whole group
+        await pb.collection('chats').delete(id)
+        return reply.send({ ok: true, deleted: true })
+      }
+
+      // If the user was the last owner/admin, promote the oldest remaining member
+      if (membership.role === 'owner' || membership.role === 'admin') {
+        const admins = await pb.collection('chatMembers').getList(1, 1, {
+          filter: `chatId = "${id}" && (role = "owner" || role = "admin")`,
+        })
+        if (admins.totalItems === 0) {
+          // No more admins — promote first remaining member
+          await pb.collection('chatMembers').update(remaining.items[0].id, { role: 'owner' })
+        }
+      }
+
+      return reply.send({ ok: true, deleted: false })
+    } catch (err) {
+      console.error('[Chats] Delete error:', err)
+      return reply.status(500).send({ error: 'Failed to leave/delete chat' })
+    }
+  })
 }
+
