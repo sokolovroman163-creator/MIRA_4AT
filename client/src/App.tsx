@@ -62,7 +62,8 @@ function AppContent() {
   const chats = useChatStore(s => s.chats)
 
   // Wire up socket event listeners
-  useSocket()
+  const { token } = useAuthStore()
+  useSocket(token)
 
   // Auto-subscribe to push notifications after auth (if permission default or granted)
   useEffect(() => {

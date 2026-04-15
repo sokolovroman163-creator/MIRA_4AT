@@ -80,24 +80,31 @@ export default function ChatPage() {
     setContextMenu({ message: null, isOpen: false, isOwn: false })
   }, [chatId])
 
-  // Register active chat
+  // Register active chat + socket room membership
   useEffect(() => {
     if (!chatId) return
     const found = chats.find(c => c.id === chatId) ?? null
     setActiveChat(found)
     clearUnread(chatId)
 
-    // Join socket room
     const socket = getSocket()
-    if (socket) {
+    if (!socket) return
+
+    // Join room immediately if already connected
+    if (socket.connected) {
       socket.emit('join_chat', { chatId })
     }
 
+    // Rejoin on (re)connect — handles the case where socket connects after mount
+    const handleConnect = () => {
+      socket.emit('join_chat', { chatId })
+    }
+    socket.on('connect', handleConnect)
+
     return () => {
       setActiveChat(null)
-      if (socket) {
-        socket.emit('leave_chat', { chatId })
-      }
+      socket.off('connect', handleConnect)
+      socket.emit('leave_chat', { chatId })
     }
   }, [chatId]) // eslint-disable-line react-hooks/exhaustive-deps
 
