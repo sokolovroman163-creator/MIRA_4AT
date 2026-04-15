@@ -64,20 +64,13 @@ export function registerMessageHandlers(io: Server, socket: Socket, userId: stri
       }
 
       // Broadcast to all chat members via their personal rooms + the chat room
-      // This ensures real-time updates even for users not currently viewing the chat
       const allMembers = await pb.collection('chatMembers').getFullList({
         filter: `chatId = "${data.chatId}"`,
       })
-
-      // Emit to the specific chat room
-      io.to(`chat:${data.chatId}`).emit('new_message', messagePayload)
-
-      // Emit to each member's personal room (for sidebar/global updates)
-      for (const member of allMembers) {
-        if (member.userId !== userId) { // Don't emit to sender's user room twice
-          io.to(`user:${member.userId}`).emit('new_message', messagePayload)
-        }
-      }
+      
+      // Using an array of rooms ensures each socket receives the message exactly once
+      const targetRooms = [`chat:${data.chatId}`, ...allMembers.map(m => `user:${m.userId}`)]
+      io.to(targetRooms).emit('new_message', messagePayload)
 
       // Send push to other members (not the sender)
       const members = await pb.collection('chatMembers').getFullList({

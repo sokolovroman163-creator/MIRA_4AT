@@ -149,6 +149,11 @@ async function main() {
       socket.join(`chat:${data.chatId}`)
     })
 
+    socket.on('join_user_room', () => {
+      socket.join(`user:${userId}`)
+      console.log(`[Socket] User ${userId} manually joined personal room`)
+    })
+
     socket.on('leave_chat', (data: { chatId: string }) => {
       socket.leave(`chat:${data.chatId}`)
     })

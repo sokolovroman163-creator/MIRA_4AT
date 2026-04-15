@@ -152,64 +152,7 @@ export default function ChatPage() {
     }
   }, [chatId, messages.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ─── Socket listeners for message interactions ────────────
-  useEffect(() => {
-    const socket = getSocket()
-    if (!socket || !chatId) return
-
-    const handleMessageEdited = (data: {
-      id: string
-      chatId: string
-      content: string
-      isEdited: boolean
-    }) => {
-      if (data.chatId === chatId) {
-        updateMessage(chatId, data.id, { content: data.content, isEdited: true })
-      }
-    }
-
-    const handleMessageDeleted = (data: { id: string; chatId: string }) => {
-      if (data.chatId === chatId) {
-        deleteMessageInStore(chatId, data.id)
-      }
-    }
-
-    const handleReactionAdded = (data: {
-      id: string
-      messageId: string
-      userId: string
-      emoji: string
-    }) => {
-      addReaction(chatId, data.messageId, {
-        id: data.id,
-        messageId: data.messageId,
-        userId: data.userId,
-        emoji: data.emoji,
-        createdAt: new Date().toISOString(),
-      })
-    }
-
-    const handleReactionRemoved = (data: {
-      messageId: string
-      reactionId: string
-      userId: string
-      emoji: string
-    }) => {
-      removeReaction(chatId, data.messageId, data.reactionId)
-    }
-
-    socket.on('message_edited', handleMessageEdited)
-    socket.on('message_deleted', handleMessageDeleted)
-    socket.on('reaction_added', handleReactionAdded)
-    socket.on('reaction_removed', handleReactionRemoved)
-
-    return () => {
-      socket.off('message_edited', handleMessageEdited)
-      socket.off('message_deleted', handleMessageDeleted)
-      socket.off('reaction_added', handleReactionAdded)
-      socket.off('reaction_removed', handleReactionRemoved)
-    }
-  }, [chatId, updateMessage, deleteMessageInStore, addReaction, removeReaction])
+  // Message interactions are now handled globally in useSocket hook
 
   // ─── Context menu handler ─────────────────────────────────
   const handleContextMenu = useCallback(
@@ -558,7 +501,8 @@ export default function ChatPage() {
 
       // Date divider
       if (!prevDate || !isSameDay(prevDate, msgDate)) {
-        items.push({ kind: 'divider', date: msgDate, key: `divider_${msg.id}` })
+        const dateKey = msgDate.toISOString().split('T')[0]
+        items.push({ kind: 'divider', date: msgDate, key: `divider_${dateKey}` })
         prevDate = msgDate
         prevSenderId = null // reset grouping on new day
       }

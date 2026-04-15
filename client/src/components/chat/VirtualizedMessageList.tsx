@@ -114,13 +114,15 @@ export default function VirtualizedMessageList({
 
   const scrollToBottom = useCallback(() => {
     if (items.length === 0) return
-    requestAnimationFrame(() => {
-      listRef.current?.scrollToRow({ index: items.length - 1, align: 'end' })
-      // Second call after dynamic heights settle
+    const index = items.length - 1
+    // Use a small delay to ensure the DOM has updated and layout is stable
+    setTimeout(() => {
+      listRef.current?.scrollToItem(index, 'end')
+      // Second pass for dynamic heights
       setTimeout(() => {
-        listRef.current?.scrollToRow({ index: items.length - 1, align: 'end' })
-      }, 80)
-    })
+        listRef.current?.scrollToItem(index, 'end')
+      }, 100)
+    }, 50)
   }, [items.length, listRef])
 
   // Scroll to bottom on initial load & new messages
@@ -183,6 +185,7 @@ export default function VirtualizedMessageList({
 
   return (
     <List<RowProps>
+      key={`list_${items.length > 0 ? items[0].key : 'empty'}`} // help stability
       listRef={listRef}
       rowCount={items.length}
       rowHeight={dynamicRowHeight}
@@ -190,7 +193,7 @@ export default function VirtualizedMessageList({
       rowProps={rowProps}
       onRowsRendered={handleRowsRendered}
       onScroll={handleScrollNative}
-      overscanCount={8}
+      overscanCount={10}
       style={{
         height,
         width,

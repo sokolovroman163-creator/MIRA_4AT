@@ -68,9 +68,9 @@ const MessageBubble = memo(function MessageBubble({
   return (
     <>
       <motion.div
-        initial={{ opacity: 0, y: 6, scale: 0.97 }}
+        initial={isOwn ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 4, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.18, ease: 'easeOut' }}
+        transition={{ duration: isOwn ? 0 : 0.12, ease: 'easeOut' }}
         style={{
           display: 'flex',
           flexDirection: 'column',

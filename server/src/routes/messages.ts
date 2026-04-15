@@ -489,6 +489,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
           reactionId: existing.items[0].id,
           userId,
           emoji,
+          chatId: msg.chatId,
         })
         
         return reply.send({ removed: true, reactionId: existing.items[0].id })
@@ -505,6 +506,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
         messageId,
         userId,
         emoji,
+        chatId: msg.chatId,
       })
 
       return reply.send({ id: reaction.id, messageId, userId, emoji })
