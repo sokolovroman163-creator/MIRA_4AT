@@ -781,6 +781,7 @@ export default function ChatPage() {
         {/* Virtualized message list */}
         {renderedItems.length > 0 && listSize.height > 0 && (
           <VirtualizedMessageList
+            key={chatId}
             items={renderedItems}
             currentUserId={currentUser?.id}
             isGroup={isGroup}
@@ -790,6 +791,7 @@ export default function ChatPage() {
             hasMore={hasMore}
             height={listSize.height}
             width={listSize.width}
+            chatId={chatId}
           />
         )}
 

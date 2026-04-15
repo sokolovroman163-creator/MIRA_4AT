@@ -34,6 +34,8 @@ interface VirtualizedMessageListProps {
   height: number
   /** Width of the container */
   width: number
+  /** Current chat ID for stability */
+  chatId: string
 }
 
 // ─── Default estimated height ───────────────────────────────
@@ -109,7 +111,7 @@ export default function VirtualizedMessageList({
 
   const dynamicRowHeight = useDynamicRowHeight({
     defaultRowHeight: DEFAULT_ROW_HEIGHT,
-    key: items.length,
+    key: chatId, // use chatId instead of items.length
   })
 
   const scrollToBottom = useCallback(() => {
@@ -185,7 +187,7 @@ export default function VirtualizedMessageList({
 
   return (
     <List<RowProps>
-      key={`list_${items.length > 0 ? items[0].key : 'empty'}`} // help stability
+      key={chatId} // Use chatId for absolute stability!
       listRef={listRef}
       rowCount={items.length}
       rowHeight={dynamicRowHeight}
