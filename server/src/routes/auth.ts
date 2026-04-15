@@ -58,6 +58,12 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         { expiresIn: '30d' }
       )
 
+      // Construct avatar URL
+      const pbUrl = process.env.POCKETBASE_URL || 'http://localhost:8090'
+      const avatarFullUrl = user.avatar
+        ? `${pbUrl}/api/files/users/${user.id}/${user.avatar}`
+        : (user.avatarUrl || '')
+
       return reply.send({
         token,
         isNewUser,
@@ -65,7 +71,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           id: user.id,
           email: user.email,
           displayName: user.displayName,
-          avatarUrl: user.avatarUrl,
+          avatarUrl: avatarFullUrl,
           bio: user.bio,
           language: user.language,
           lastSeen: user.lastSeen,
@@ -98,13 +104,19 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         { expiresIn: '30d' }
       )
 
+      // Construct avatar URL
+      const pbUrl = process.env.POCKETBASE_URL || 'http://localhost:8090'
+      const avatarFullUrl = user.avatar
+        ? `${pbUrl}/api/files/users/${user.id}/${user.avatar}`
+        : (user.avatarUrl || '')
+
       return reply.send({
         token: newToken,
         user: {
           id: user.id,
           email: user.email,
           displayName: user.displayName,
-          avatarUrl: user.avatarUrl,
+          avatarUrl: avatarFullUrl,
           bio: user.bio,
           language: user.language,
           lastSeen: user.lastSeen,

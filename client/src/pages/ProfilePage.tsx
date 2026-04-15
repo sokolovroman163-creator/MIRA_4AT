@@ -39,17 +39,20 @@ function EditProfileModal({
   const handleSave = useCallback(async () => {
     setIsSaving(true)
     try {
+      let newAvatarUrl = undefined
       // Upload avatar if changed
       if (avatarFile) {
         const formData = new FormData()
-        formData.append('avatarUrl', avatarFile)
-        await api.uploadFile('/api/users/me/avatar', formData)
+        formData.append('avatar', avatarFile)
+        const uploadRes = await api.uploadFile<{ avatarUrl: string }>('/api/users/me/avatar', formData)
+        newAvatarUrl = uploadRes.avatarUrl
       }
 
-      // Update name/bio
+      // Update name/bio and optionally avatarUrl
       await updateProfile({
         displayName: name.trim().slice(0, 50),
         bio: bio.trim().slice(0, 70),
+        ...(newAvatarUrl ? { avatarUrl: newAvatarUrl } : {})
       })
 
       if (avatarPreview) URL.revokeObjectURL(avatarPreview)

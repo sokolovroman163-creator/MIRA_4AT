@@ -31,7 +31,7 @@ interface AuthState {
   loginWithGoogle: () => Promise<void>
   logout: () => Promise<void>
   initialize: () => Promise<void>
-  updateProfile: (data: Partial<Pick<User, 'displayName' | 'bio' | 'language'>>) => Promise<void>
+  updateProfile: (data: Partial<Pick<User, 'displayName' | 'bio' | 'language' | 'avatarUrl'>>) => Promise<void>
   clearNewUser: () => void
 }
 
@@ -195,9 +195,15 @@ export const useAuthStore = create<AuthState>()(
       },
 
       updateProfile: async (data) => {
-        const response = await api.patch<User>('/api/users/me', data)
+        // Only send fields that belong in the PATCH body
+        const { avatarUrl, ...patchData } = data
+        let response = {}
+        if (Object.keys(patchData).length > 0) {
+          response = await api.patch<User>('/api/users/me', patchData)
+        }
+        
         set(state => ({
-          user: state.user ? { ...state.user, ...response } : null,
+          user: state.user ? { ...state.user, ...response, ...(avatarUrl ? { avatarUrl } : {}) } : null,
         }))
       },
 

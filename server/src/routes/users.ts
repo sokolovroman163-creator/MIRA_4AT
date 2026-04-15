@@ -9,11 +9,16 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
     const pb = getPB()
     try {
       const user = await pb.collection('users').getOne(userId)
+      const pbUrl = process.env.POCKETBASE_URL || 'http://localhost:8090'
+      const avatarFullUrl = user.avatar
+        ? `${pbUrl}/api/files/users/${user.id}/${user.avatar}`
+        : (user.avatarUrl || '')
+
       return reply.send({
         id: user.id,
         email: user.email,
         displayName: user.displayName,
-        avatarUrl: user.avatarUrl,
+        avatarUrl: avatarFullUrl,
         bio: user.bio,
         language: user.language,
         isOnline: user.isOnline,
@@ -37,6 +42,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
         ...(body.bio !== undefined && { bio: body.bio.slice(0, 70) }),
         ...(body.language && { language: body.language }),
       })
+      console.log('[Users] Profile updated for:', userId)
       return reply.send({ id: updated.id, displayName: updated.displayName, bio: updated.bio, language: updated.language })
     } catch (err) {
       console.error('[Users] Update error:', err)
@@ -52,6 +58,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const pb = getPB()
+    const pbUrl = process.env.POCKETBASE_URL || 'http://localhost:8090'
     try {
       const results = await pb.collection('users').getList(1, 20, {
         filter: `displayName ~ "${q}" || email ~ "${q}"`,
@@ -59,7 +66,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
       return reply.send(results.items.map(u => ({
         id: u.id,
         displayName: u.displayName,
-        avatarUrl: u.avatarUrl,
+        avatarUrl: u.avatar ? `${pbUrl}/api/files/users/${u.id}/${u.avatar}` : (u.avatarUrl || ''),
         email: u.email,
         isOnline: u.isOnline,
         lastSeen: u.lastSeen,
@@ -76,29 +83,36 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
     const pb = getPB()
 
     try {
+      console.log('[Users] Processing avatar upload for:', userId)
       const data = await request.file()
       if (!data) {
+        console.warn('[Users] No file provided for avatar upload')
         return reply.status(400).send({ error: 'No file provided' })
       }
 
       // Validate mime type
       if (!data.mimetype.startsWith('image/')) {
+        console.warn('[Users] Invalid mime type for avatar:', data.mimetype)
         return reply.status(400).send({ error: 'Only image files are allowed' })
       }
 
+      console.log('[Users] Reading file buffer...')
       const buffer = await data.toBuffer()
       const blob = new Blob([new Uint8Array(buffer)], { type: data.mimetype })
       const formData = new FormData()
-      formData.append('avatarUrl', blob, data.filename)
+      // PocketBase file field name is 'avatar'
+      formData.append('avatar', blob, data.filename)
 
+      console.log('[Users] Updating PocketBase record...')
       const updated = await pb.collection('users').update(userId, formData)
 
       // Build the full avatar URL from PocketBase
       const pbUrl = process.env.POCKETBASE_URL || 'http://localhost:8090'
-      const avatarUrl = updated.avatarUrl
-        ? `${pbUrl}/api/files/users/${userId}/${updated.avatarUrl}`
+      const avatarUrl = updated.avatar
+        ? `${pbUrl}/api/files/users/${userId}/${updated.avatar}`
         : ''
 
+      console.log('[Users] Avatar updated successfully:', avatarUrl)
       return reply.send({ avatarUrl })
     } catch (err) {
       console.error('[Users] Avatar upload error:', err)

@@ -41,17 +41,28 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
 
   const handleComplete = async () => {
     if (isLoading) return
+    console.log('[Onboarding] Starting complete process. avatarFile:', avatarFile?.name)
     setIsLoading(true)
     setError(null)
     try {
+      let newAvatarUrl = undefined
       // Upload avatar if selected
       if (avatarFile) {
+        console.log('[Onboarding] Uploading avatar...')
         const formData = new FormData()
         formData.append('avatar', avatarFile)
-        await api.uploadFile('/api/users/me/avatar', formData)
+        const res = await api.uploadFile<{ avatarUrl: string }>('/api/users/me/avatar', formData)
+        newAvatarUrl = res.avatarUrl
+        console.log('[Onboarding] Avatar uploaded successfully')
       }
 
-      await updateProfile({ displayName: trimmedName })
+      console.log('[Onboarding] Updating profile displayName:', trimmedName)
+      await updateProfile({ 
+        displayName: trimmedName,
+        ...(newAvatarUrl ? { avatarUrl: newAvatarUrl } : {})
+      })
+      console.log('[Onboarding] Profile updated successfully')
+      
       onComplete()
     } catch (err) {
       console.error('[Onboarding] Complete error:', err)
@@ -63,10 +74,13 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
 
   const handleSkipAvatar = async () => {
     if (isLoading) return
+    console.log('[Onboarding] Skipping avatar step')
     setIsLoading(true)
     setError(null)
     try {
+      console.log('[Onboarding] Updating profile displayName (skip avatar):', trimmedName)
       await updateProfile({ displayName: trimmedName })
+      console.log('[Onboarding] Profile updated successfully (skip avatar)')
       onComplete()
     } catch (err) {
       console.error('[Onboarding] Skip error:', err)

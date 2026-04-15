@@ -1,204 +1,96 @@
-# 🚀 Инструкция по деплою MIRA Messenger на Beget (VPS)
+# 🔑 Инструкция по ключам и деплою (Где искать и как)
 
-Это руководство поможет вам перенести ваш мессенджер с локального компьютера на сервер Beget. Мы будем использовать **VPS (Ubuntu)**, так как это самый гибкий вариант для Node.js и PocketBase.
-
----
-
-## 📋 Предварительные требования
-1. **VPS от Beget**: Рекомендуется Ubuntu 22.04 или 24.04.
-2. **Домен**: Привяжите домен к IP вашего сервера в панели Beget.
-3. **SSH доступ**: Вы должны уметь заходить на сервер через терминал (или консоль Beget).
+Эта инструкция содержит ваши реальные ключи и описание того, где их найти в консолях разработчика, если вы их потеряете или захотите сменить.
 
 ---
 
-## 🛠 Шаг 1: Подготовка сервера
+## 🧭 Где искать ключи?
 
-Зайдите на сервер через терминал и выполните команды для обновления системы и установки Node.js:
+### 1. Переменные Firebase (Web & Admin)
+Все ключи для фронтенда и бэкенда находятся в **[Firebase Console](https://console.firebase.google.com/)**:
+- **Для клиента (VITE_FIREBASE_...)**: Настройки проекта (шестеренка) -> **Project Settings** -> Вкладка **General**. Прокрутите вниз до раздела "Your apps". Там вы найдете "Firebase SDK snippet" в формате "Config".
+- **Для сервера (FIREBASE_PROJECT_ID и др.)**: Те же настройки проекта -> Вкладка **Service accounts**. Там можно сгенерировать новый закрытый ключ (JSON), данные из которого (Project ID, Email, Private Key) вставляются в `server/.env`.
 
-```bash
-# Обновляем список пакетов
-sudo apt update && sudo apt upgrade -y
+### 2. Google OAuth (Google Client ID)
+Находится в **[Google Cloud Console](https://console.cloud.google.com/)**:
+- Перейдите в **APIs & Services** -> **Credentials**.
+- Ищите под заголовком **OAuth 2.0 Client IDs**. Если его нет — создайте (тип: Web application).
+- **Важно для деплоя**: Добавьте ваш домен (например, `https://mira.ru`) и `https://mira.ru/auth/google/callback` в список "Authorized JavaScript origins" и "Authorized redirect URIs".
 
-# Устанавливаем Node.js (рекомендуемая версия)
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install -y nodejs
+### 3. VAPID Keys (Push-уведомления)
+Генерируются один раз. Можно использовать те, что уже есть, или создать новые командой `npx web-push generate-vapid-keys`.
+- **Public Key**: Идет и в клиент (VITE_VAPID_PUBLIC_KEY), и на сервер.
+- **Private Key**: Идет **только** на сервер.
 
-# Проверяем версии
-node -v
-npm -v
-
-# Устанавливаем PM2 (менеджер процессов для фоновой работы)
-sudo npm install -g pm2
-```
-
----
-
-## 📥 Шаг 2: Клонирование проекта
-
-```bash
-# Перейдите в папку, где будет лежать проект (например, /var/www)
-cd /var/www
-git clone https://github.com/sokolovroman163-creator/MIRA_4AT.git mira
-cd mira
-
-# Устанавливаем зависимости для всего проекта
-npm run install:all
-```
+### 4. Giphy API (Гифки)
+Находится в **[Giphy Developers](https://developers.giphy.com/dashboard/)**:
+- Создайте новое приложение (App) и получите свой **API Key**.
 
 ---
 
-## 🗄 Шаг 3: Настройка PocketBase
+## 📄 Настройка файлов .env на сервере
 
-PocketBase — это ваша база данных. На сервере нам нужна Linux-версия.
+Скопируйте эти блоки и вставьте их в соответствующие файлы на сервере (через `nano` или `vim`).
 
-```bash
-# Создаем папку для базы
-mkdir pb_server
-cd pb_server
-
-# Скачиваем официальный бинарный файл для Linux (x64)
-wget https://github.com/pocketbase/pocketbase/releases/download/v0.26.6/pocketbase_0.26.6_linux_amd64.zip
-
-# Распаковываем (если нет unzip: sudo apt install unzip)
-sudo apt install unzip
-unzip pocketbase_0.26.6_linux_amd64.zip
-rm pocketbase_0.26.6_linux_amd64.zip
-
-# Запускаем один раз для проверки
-./pocketbase serve --http="127.0.0.1:8090"
-```
-*Нажмите `Ctrl+C`, чтобы остановить.*
-
-Чтобы PocketBase работал всегда, добавим его в PM2:
-```bash
-pm2 start "./pocketbase serve --http='127.0.0.1:8090'" --name "mira-db"
-pm2 save
-```
-
----
-
-## ⚙️ Шаг 4: Настройка переменных окружения (.env)
-
-На сервере вам нужно создать файлы `.env` с реальными данными.
-
-### Для сервера (backend):
-Создайте файл в папке `server/.env`:
-```bash
-nano server/.env
-```
-Вставьте туда содержимое из вашего локального файла, но измените URLs:
+### 1. Сервер (`/var/www/mira/server/.env`)
 ```env
 PORT=3000
-POCKETBASE_URL=http://127.0.0.1:8090
 CLIENT_URL=https://ваш-домен.ru
-JWT_SECRET=ВАШ_СЕКРЕТ_ИЗ_ЛОКАЛКИ
-# Остальные настройки Firebase/WebPush/Google OAuth...
+POCKETBASE_URL=http://127.0.0.1:8090
+POCKETBASE_ADMIN_EMAIL=sokolovroman163@gmail.com
+POCKETBASE_ADMIN_PASSWORD=Roma180388
+
+# Firebase Admin (Уже настроено)
+FIREBASE_PROJECT_ID=mira-chat-27fdd
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk-fbsvc@mira-chat-27fdd.iam.gserviceaccount.com
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCeKJ0ussVJTFW7\nl9CgSOR0gGjGF3GJ3OFwKi2WSykIHPHz3Q9Y1VSdHlkfNwoI6cDbpCMGE9lDKnX2\ne0A//POKb87iQ8kaSycuRWmTJv5GCMQrozS40gbqd5cnWn12l5HrKRK3RgAnCbIG\nDpkuL30DL+Lu+bRu+u+Blf2JyLP88GdF03KbjZRReo/y8g0AeLoNCa4JwO619Rg1\niAiAEDIm1ALwM7TdvDainff9l/BrWgJW9/WZf4Ac8Xw9tyLFjWNnT5/LN3fOt5Uj\nIM14iS0cU8pIQJoPaKg1AssyvYJc/5NtzMjla2FzOLwU2owNTXzt5eiDbZ99ybU/\nARK40KSLAgMBAAECggEAEEEtUmDWLN/XCdYi/24uaJjP69f598jHNJ9pGwKzf112\nMnF8Q819Cj7VuwMNmXfotcorPVMp56DECeaF5m2pXAd8tD1yPC0QJE3G+XQu+uSo\nwLFf2EThqBRNaSKANYGDYi9Q+JwNpPV2oe+7J4eC6iJwSM5KEIPivKc9LP1/HhYv\nq3kqOssdzXhl5Agr+EkXsyh7Vhf8DwNqUzV9D9RntmtVcKCpiMm8KFz0SFS8R3hu\nu49vIexnRWit+EKwbzZrxjkAeA8oyseZKZbQ+540N4lM7eKn46tY0uffM4B8ItCN\n+5du2QJKrrEcXMTdzBvYOOYS8OF7NxrwHfCg3GDkWQKBgQDQxuo5jTde9pKWoKUl\nrgWmE1Z3x0gEFIPDoP7qTGFUHPsJczWbhEKCnTzyC7MpcHv06Ahm7lnyOXuICgMe\nECnZ7sOZMKSGJ8U7gV1B5czQ8Zb3lBhuPNml+sTtHqB0965G3Mft0+OVa1X5f1bP\nMJEjbS1oORq1d9YQKUAYsowqaQKBgQDB7q223NZ2GQMscb/Rxf17sEM0L3TTLhc4\neAl6byWtahmXwNULcM1D0aV9AwPwdRd5ZOU7HUNYRFgL68SQMzfnoRJRefVogQ6q\n/70GMCfyXR2vyWZhDwnoDLhcoSvodcSB+wZ5LqOSwQdNZGtL3d7d7lLCzif2QiZg\nZBP+JeYw0wKBgARCWprr95o3W4w5IMVhBHp74IK3DRAQPxPpn+m1vzKRGMn7kLdo\nflbd0FV7yZ7pzY2Ugj9fU3RumcePtLqTR9dLWLAyXtjhzNNG81kZ0BDfLN5GJi1x\njlslf4j62/km6GZHsMh4TydINkvNvj6h1gQsAQYkTBgxpqtTvBwE4HkpAoGALLuu\nbEjCW1lnpv/R/ERMNRSyW746l1/BUXA213v91+NqZdvACLSLVIJuRsjERtnrgT/p\ntFoKp7iUCqPmolB+K7q2q/6SwflK9dypsFy5Sil6aIrvR6Idad5NRGiU5TkNC+Jo\nWtmMN5S453wrV8Ok3dJUWsUM6LvXeFJ9XhlF4KsCgYEAjIPD4PY1Ri635zxt882W\nDyBtHx0tO3ns8vMRTnBY+VWLNj4j98MdP02y+3ud23ub7yCsACNZyI3VmYwdm3pG\nPKfmGVKtOJGKHTrvknj2f0xsMVe0ClTZYeuU9UVRRo17N22e3CaaY74Ua7yFdYy0\nfddY6JuPCJo+S4nZ4ST7x+k=\n-----END PRIVATE KEY-----\n"
+
+# JWT
+JWT_SECRET=your-super-secret-jwt-key-change-in-production
+
+# VAPID Keys
+VAPID_PUBLIC_KEY=BFpLZczFSPF2e1KxALX6KM-pvsa_Cs2WwBoHcgcIscNZEIrnJDCbGUzpO6o45613V6HT4GHd4Z0QV1tHfne1XeM
+VAPID_PRIVATE_KEY=_H2ZmpZnAWs8N-gKx7-44GolY-2pJuSnXu6niQkLrfU
+VAPID_SUBJECT=mailto:admin@mira.local
+
+# Giphy
+GIPHY_API_KEY=your-giphy-api-key
 ```
 
-### Для клиента (frontend):
-Создайте файл в папке `client/.env`:
-```bash
-nano client/.env
-```
+### 2. Клиент (`/var/www/mira/client/.env`)
 ```env
 VITE_API_URL=https://ваш-домен.ru
 VITE_SOCKET_URL=https://ваш-домен.ru
 VITE_POCKETBASE_URL=https://ваш-домен.ru
-# Остальные настройки Firebase/VAPID/Google...
+
+# Firebase Config (Уже настроено)
+VITE_FIREBASE_API_KEY=AIzaSyBaqFPVBMuLlylHs9GBUdPF3kZWFfMSz9A
+VITE_FIREBASE_AUTH_DOMAIN=mira-chat-27fdd.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=mira-chat-27fdd
+VITE_FIREBASE_STORAGE_BUCKET=mira-chat-27fdd.firebasestorage.app
+VITE_FIREBASE_MESSAGING_SENDER_ID=988094715563
+VITE_FIREBASE_APP_ID=1:988094715563:web:8f86bcbf9511a56e0f89ee
+
+# VAPID
+VITE_VAPID_PUBLIC_KEY=BFpLZczFSPF2e1KxALX6KM-pvsa_Cs2WwBoHcgcIscNZEIrnJDCbGUzpO6o45613V6HT4GHd4Z0QV1tHfne1XeM
+
+# Google OAuth
+VITE_GOOGLE_CLIENT_ID=988094715563-eal8hj5f52l477dr96us04qkt1rb74ao.apps.googleusercontent.com
+
+# Giphy
+VITE_GIPHY_API_KEY=your-giphy-api-key
 ```
 
 ---
 
-## 🏗 Шаг 5: Сборка и запуск
+## 🚀 Как деплоить (Краткая шпаргалка)
 
-```bash
-# Собираем клиент (превращаем React в статику)
-cd client
-npm run build
-cd ..
-
-# Собираем сервер
-cd server
-npm run build
-
-# Запускаем сервер через PM2
-pm2 start dist/index.js --name "mira-server"
-pm2 save
-```
-
----
-
-## 🌐 Шаг 6: Настройка Nginx (Прокси)
-
-Чтобы ваш сайт открывался по домену (порт 80/443), а не по порту 3000, нужен Nginx.
-
-```bash
-sudo apt install nginx
-sudo nano /etc/nginx/sites-available/mira
-```
-
-Вставьте конфиг:
-```nginx
-server {
-    listen 80;
-    server_name ваш-домен.ru;
-
-    # Раздача фронтенда (React билд)
-    location / {
-        root /var/www/mira/client/dist;
-        index index.html;
-        try_files $uri $uri/ /index.html;
-    }
-
-    # Прокси на API PocketBase (файлы)
-    location /api/files {
-        proxy_pass http://127.0.0.1:8090;
-        proxy_set_header Host $host;
-    }
-
-    # Прокси на основной бэкенд (Fastify)
-    location /api {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-    }
-
-    # Socket.IO
-    location /socket.io {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
-}
-```
-
-Активируйте конфиг:
-```bash
-sudo ln -s /etc/nginx/sites-available/mira /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl restart nginx
-```
-
----
-
-## 🔒 Шаг 7: SSL (HTTPS) — Обязательно для уведомлений и микрофона!
-
-```bash
-sudo apt install certbot python3-certbot-nginx
-sudo certbot --nginx -d ваш-домен.ru
-```
-
----
-
-## 💡 Полезные команды PM2
-- `pm2 status` — проверить, что всё работает.
-- `pm2 logs` — смотреть ошибки, если что-то не так.
-- `pm2 restart all` — если вы обновили код через git pull.
-
----
-
-**Поздравляю! Ваш MIRA Messenger должен быть доступен в сети.**
+1. **Сервер**: Клонируйте проект, установите Node.js 20+, PM2 и Nginx.
+2. **База**: Скачайте PocketBase для Linux, запустите его через PM2 (`pm2 start "./pocketbase serve"`).
+3. **Конфиг**: Создайте `.env` файлы (см. выше) и замените `https://ваш-домен.ru` на ваш реальный домен.
+4. **Сборка**:
+   - В папке `client`: `npm install && npm run build`
+   - В папке `server`: `npm install && npm run build`
+5. **Запуск**: В папке `server`: `pm2 start dist/index.js --name mira-server`.
+6. **Nginx**: Настройте проксирование на порты 3000 (API/Socket) и 8090 (Base) + статика из `client/dist`.
+7. **SSL**: Обязательно выполните `certbot --nginx`, так как без HTTPS не будет работать микрофон (голосовые) и уведомления.
