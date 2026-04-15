@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useRef, memo } from 'react'
-import { List, useListRef, useDynamicRowHeight, type ListProps } from 'react-window'
+import { List, useListRef, useDynamicRowHeight } from 'react-window'
 import type { Message } from '../../types'
 import MessageBubble from './MessageBubble'
 import DateDivider from './DateDivider'
@@ -16,10 +16,14 @@ export type ListItem =
     }
 
 interface RowProps {
-  items: ListItem[]
-  currentUserId: string | undefined
-  isGroup: boolean
-  onContextMenu: (e: React.MouseEvent, message: Message) => void
+  index: number
+  style: React.CSSProperties
+  data: {
+    items: ListItem[]
+    currentUserId: string | undefined
+    isGroup: boolean
+    onContextMenu: (e: React.MouseEvent, message: Message) => void
+  }
 }
 
 interface VirtualizedMessageListProps {
@@ -30,18 +34,12 @@ interface VirtualizedMessageListProps {
   onLoadMore: () => void
   isLoadingMore: boolean
   hasMore: boolean
-  /** Height of the container */
   height: number
-  /** Width of the container */
   width: number
-  /** Current chat ID for stability */
   chatId: string
 }
-
-// ─── Default estimated height ───────────────────────────────
 const DEFAULT_ROW_HEIGHT = 52
 
-// ─── Row component ──────────────────────────────────────────
 const Row = memo(function Row({
   index,
   style,
@@ -49,24 +47,13 @@ const Row = memo(function Row({
   currentUserId,
   isGroup,
   onContextMenu,
-}: {
-  index: number
-  style: React.CSSProperties
-  ariaAttributes: {
-    'aria-posinset': number
-    'aria-setsize': number
-    role: 'listitem'
-  }
-  items: ListItem[]
-  currentUserId: string | undefined
-  isGroup: boolean
-  onContextMenu: (e: React.MouseEvent, message: Message) => void
-}) {
+}: any) {
   const item = items[index]
+  if (!item) return null
 
   if (item.kind === 'divider') {
     return (
-      <div style={style} data-row-index={index}>
+      <div style={style}>
         <DateDivider date={item.date} />
       </div>
     )
@@ -77,7 +64,7 @@ const Row = memo(function Row({
   const showSender = isGroup && !isOwn
 
   return (
-    <div style={style} data-row-index={index}>
+    <div style={style}>
       <MessageBubble
         message={message}
         isOwn={isOwn}
@@ -92,7 +79,6 @@ const Row = memo(function Row({
   )
 })
 
-// ─── Main component ─────────────────────────────────────────
 export default function VirtualizedMessageList({
   items,
   currentUserId,
@@ -103,82 +89,85 @@ export default function VirtualizedMessageList({
   hasMore,
   height,
   width,
+  chatId,
 }: VirtualizedMessageListProps) {
   const listRef = useListRef(null)
   const prevItemsLengthRef = useRef(0)
-  // Track whether the user is near the bottom so we can auto-scroll
   const isNearBottomRef = useRef(true)
 
   const dynamicRowHeight = useDynamicRowHeight({
     defaultRowHeight: DEFAULT_ROW_HEIGHT,
-    key: chatId, // use chatId instead of items.length
+    key: `${chatId}-${items.length}`,
   })
 
   const scrollToBottom = useCallback(() => {
     if (items.length === 0) return
+    const list = listRef.current
+    if (!list) return
+
     const index = items.length - 1
-    // Use a small delay to ensure the DOM has updated and layout is stable
-    setTimeout(() => {
-      listRef.current?.scrollToItem(index, 'end')
-      // Second pass for dynamic heights
-      setTimeout(() => {
-        listRef.current?.scrollToItem(index, 'end')
-      }, 100)
-    }, 50)
+
+    const performScroll = () => {
+      // В v2 метод называется scrollToRow и принимает объект
+      if (typeof list.scrollToRow === 'function') {
+        list.scrollToRow({
+          index,
+          align: 'end',
+          behavior: 'instant'
+        })
+      }
+      
+      // На всякий случай дублируем через DOM
+      const outer = list.element || list._outerRef
+      if (outer) {
+        outer.scrollTop = outer.scrollHeight + 1000
+      }
+    }
+
+    performScroll()
+    setTimeout(performScroll, 50)
+    setTimeout(performScroll, 300)
   }, [items.length, listRef])
 
-  // Scroll to bottom on initial load & new messages
+  // При смене чата
+  useEffect(() => {
+    prevItemsLengthRef.current = items.length
+    if (items.length > 0) {
+      scrollToBottom()
+    }
+  }, [chatId]) 
+
+  // При новых сообщениях
   useEffect(() => {
     const prevLen = prevItemsLengthRef.current
     prevItemsLengthRef.current = items.length
 
-    if (items.length === 0) return
-
-    if (prevLen === 0 && items.length > 0) {
-      // Initial load — always scroll to bottom
-      scrollToBottom()
-      return
-    }
-
-    // New message(s) appended at the end (not history prepend)
-    if (items.length > prevLen) {
-      const newCount = items.length - prevLen
-      // Only auto-scroll for 1–3 new messages at a time (not bulk history loads)
-      if (newCount > 5) return
-
+    if (items.length > prevLen && prevLen > 0) {
       const lastItem = items[items.length - 1]
-      if (lastItem.kind !== 'message') return
-
-      const isOwn = lastItem.message.senderId === currentUserId
-
-      // Always scroll if it's our own message OR user was already near bottom
+      const isOwn = lastItem.kind === 'message' && lastItem.message.senderId === currentUserId
+      
       if (isOwn || isNearBottomRef.current) {
         scrollToBottom()
       }
     }
-  }, [items.length, currentUserId, items, scrollToBottom])
+  }, [items.length, currentUserId, scrollToBottom])
 
-  // Intercept native scroll to track if user is near the bottom
-  const handleScrollNative = useCallback(
-    (e: React.UIEvent<HTMLDivElement>) => {
-      const el = e.currentTarget
-      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
-      isNearBottomRef.current = distanceFromBottom < 120
-    },
-    []
-  )
+  const handleScroll = useCallback(({ scrollDirection, scrollOffset, scrollUpdateWasRequested }: any) => {
+    if (scrollUpdateWasRequested) return
+    
+    if (scrollOffset < 300 && hasMore && !isLoadingMore && scrollDirection === 'backward') {
+      onLoadMore()
+    }
 
-  // Handle visible rows change for load more (when near top)
-  const handleRowsRendered = useCallback(
-    (visibleRows: { startIndex: number; stopIndex: number }) => {
-      if (visibleRows.startIndex <= 2 && hasMore && !isLoadingMore) {
-        onLoadMore()
-      }
-    },
-    [hasMore, isLoadingMore, onLoadMore]
-  )
+    const list = listRef.current
+    const outer = list?.element || list?._outerRef
+    if (outer) {
+      const distanceFromBottom = outer.scrollHeight - outer.scrollTop - outer.clientHeight
+      isNearBottomRef.current = distanceFromBottom < 150
+    }
+  }, [hasMore, isLoadingMore, onLoadMore])
 
-  const rowProps: RowProps = {
+  const rowProps = {
     items,
     currentUserId,
     isGroup,
@@ -186,19 +175,17 @@ export default function VirtualizedMessageList({
   }
 
   return (
-    <List<RowProps>
-      key={chatId} // Use chatId for absolute stability!
-      listRef={listRef}
+    <List
+      listRef={listRef} // В v2 используется именно этот проп
+      height={height}
+      width={width}
       rowCount={items.length}
       rowHeight={dynamicRowHeight}
-      rowComponent={Row as ListProps<RowProps>['rowComponent']}
+      rowComponent={Row}
       rowProps={rowProps}
-      onRowsRendered={handleRowsRendered}
-      onScroll={handleScrollNative}
+      onScroll={handleScroll}
       overscanCount={10}
       style={{
-        height,
-        width,
         overscrollBehavior: 'contain',
         WebkitOverflowScrolling: 'touch',
       }}

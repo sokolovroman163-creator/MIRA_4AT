@@ -20,6 +20,7 @@ function runCommand(conn, cmd) {
 const useSocketTs = readFileSync('client/src/hooks/useSocket.ts', 'utf8');
 const chatPageTsx = readFileSync('client/src/pages/ChatPage.tsx', 'utf8');
 const appTsx = readFileSync('client/src/App.tsx', 'utf8');
+const virtualListTsx = readFileSync('client/src/components/chat/VirtualizedMessageList.tsx', 'utf8');
 
 conn.on('ready', async () => {
   console.log('=== SSH Connected — Deploying Final Client Fixes ===\n');
@@ -34,7 +35,8 @@ conn.on('ready', async () => {
         const files = [
           { local: useSocketTs, remote: '/var/www/mira/client/src/hooks/useSocket.ts' },
           { local: chatPageTsx, remote: '/var/www/mira/client/src/pages/ChatPage.tsx' },
-          { local: appTsx, remote: '/var/www/mira/client/src/App.tsx' }
+          { local: appTsx, remote: '/var/www/mira/client/src/App.tsx' },
+          { local: virtualListTsx, remote: '/var/www/mira/client/src/components/chat/VirtualizedMessageList.tsx' }
         ];
 
         let completed = 0;
