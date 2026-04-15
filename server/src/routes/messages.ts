@@ -79,7 +79,18 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
       // Broadcast via Socket.IO — get io from app instance
       const io = (app as FastifyInstance & { io?: import('socket.io').Server }).io
       if (io) {
+        // Emit to the specific chat room
         io.to(`chat:${chatId}`).emit('new_message', messagePayload)
+
+        // Get members to emit to their personal rooms
+        const allMembers = await pb.collection('chatMembers').getFullList({
+          filter: `chatId = "${chatId}"`,
+        })
+        for (const member of allMembers) {
+          if (member.userId !== userId) {
+            io.to(`user:${member.userId}`).emit('new_message', messagePayload)
+          }
+        }
       }
 
       // Push notifications to other members
@@ -186,7 +197,18 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
 
       const io = (app as FastifyInstance & { io?: import('socket.io').Server }).io
       if (io) {
+        // Emit to the specific chat room
         io.to(`chat:${chatId}`).emit('new_message', messagePayload)
+
+        // Get members to emit to their personal rooms
+        const allMembers = await pb.collection('chatMembers').getFullList({
+          filter: `chatId = "${chatId}"`,
+        })
+        for (const member of allMembers) {
+          if (member.userId !== userId) {
+            io.to(`user:${member.userId}`).emit('new_message', messagePayload)
+          }
+        }
       }
 
       // Push to other members

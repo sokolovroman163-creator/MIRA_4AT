@@ -85,7 +85,10 @@ export default function ChatPage() {
     if (!chatId) return
     const found = chats.find(c => c.id === chatId) ?? null
     setActiveChat(found)
-    clearUnread(chatId)
+    
+    if (found) {
+      clearUnread(chatId)
+    }
 
     const socket = getSocket()
     if (!socket) return
@@ -106,7 +109,7 @@ export default function ChatPage() {
       socket.off('connect', handleConnect)
       socket.emit('leave_chat', { chatId })
     }
-  }, [chatId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [chatId, chats.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load messages on mount
   useEffect(() => {

@@ -141,6 +141,9 @@ async function main() {
     const userId = socket.data.userId as string
     console.log(`[Socket] User ${userId} connected (${socket.id})`)
 
+    // Join personal room for user-targeted events (e.g. new messages in any chat)
+    socket.join(`user:${userId}`)
+
     // Join/leave chat rooms
     socket.on('join_chat', (data: { chatId: string }) => {
       socket.join(`chat:${data.chatId}`)

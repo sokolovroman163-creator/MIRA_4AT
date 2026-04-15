@@ -74,12 +74,19 @@ export const useMessageStore = create<MessageState>((set, get) => ({
   },
 
   addMessage: (chatId, message) => {
-    set(state => ({
-      messages: {
-        ...state.messages,
-        [chatId]: [...(state.messages[chatId] || []), message],
-      },
-    }))
+    set(state => {
+      const current = state.messages[chatId] || []
+      // Prevent duplicates by id or localId
+      const exists = current.some(m => m.id === message.id || (message.localId && m.localId === message.localId))
+      if (exists) return state
+
+      return {
+        messages: {
+          ...state.messages,
+          [chatId]: [...current, message],
+        },
+      }
+    })
   },
 
   updateMessage: (chatId, messageId, data) => {
