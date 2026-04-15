@@ -9,9 +9,11 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
     const pb = getPB()
     try {
       const user = await pb.collection('users').getOne(userId)
-      const pbUrl = process.env.POCKETBASE_URL || 'http://localhost:8090'
+      // PocketBase v0.26+: auth collections store files under _pb_users_auth_ path
+      // Use public URL for file serving (via Nginx proxy)
+      const pbUrl = process.env.POCKETBASE_FILES_URL || process.env.POCKETBASE_URL || 'http://localhost:8090'
       const avatarFullUrl = user.avatar
-        ? `${pbUrl}/api/files/users/${user.id}/${user.avatar}`
+        ? `${pbUrl}/api/files/_pb_users_auth_/${user.id}/${user.avatar}`
         : (user.avatarUrl || '')
 
       return reply.send({
@@ -58,7 +60,8 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const pb = getPB()
-    const pbUrl = process.env.POCKETBASE_URL || 'http://localhost:8090'
+    // Use public URL for file serving (via Nginx proxy)
+    const pbUrl = process.env.POCKETBASE_FILES_URL || process.env.POCKETBASE_URL || 'http://localhost:8090'
     try {
       const results = await pb.collection('users').getList(1, 20, {
         filter: `displayName ~ "${q}" || email ~ "${q}"`,
@@ -66,7 +69,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
       return reply.send(results.items.map(u => ({
         id: u.id,
         displayName: u.displayName,
-        avatarUrl: u.avatar ? `${pbUrl}/api/files/users/${u.id}/${u.avatar}` : (u.avatarUrl || ''),
+        avatarUrl: u.avatar ? `${pbUrl}/api/files/_pb_users_auth_/${u.id}/${u.avatar}` : (u.avatarUrl || ''),
         email: u.email,
         isOnline: u.isOnline,
         lastSeen: u.lastSeen,
@@ -107,9 +110,11 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
       const updated = await pb.collection('users').update(userId, formData)
 
       // Build the full avatar URL from PocketBase
-      const pbUrl = process.env.POCKETBASE_URL || 'http://localhost:8090'
+      // PocketBase v0.26+: auth collections store files under _pb_users_auth_ path
+      // Use public URL for file serving (via Nginx proxy)
+      const pbUrl = process.env.POCKETBASE_FILES_URL || process.env.POCKETBASE_URL || 'http://localhost:8090'
       const avatarUrl = updated.avatar
-        ? `${pbUrl}/api/files/users/${userId}/${updated.avatar}`
+        ? `${pbUrl}/api/files/_pb_users_auth_/${userId}/${updated.avatar}`
         : ''
 
       console.log('[Users] Avatar updated successfully:', avatarUrl)

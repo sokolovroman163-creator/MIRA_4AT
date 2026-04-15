@@ -59,9 +59,11 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       )
 
       // Construct avatar URL
-      const pbUrl = process.env.POCKETBASE_URL || 'http://localhost:8090'
+      // PocketBase v0.26+: auth collections store files under _pb_users_auth_ path
+      // Use public URL for file serving (via Nginx proxy)
+      const pbUrl = process.env.POCKETBASE_FILES_URL || process.env.POCKETBASE_URL || 'http://localhost:8090'
       const avatarFullUrl = user.avatar
-        ? `${pbUrl}/api/files/users/${user.id}/${user.avatar}`
+        ? `${pbUrl}/api/files/_pb_users_auth_/${user.id}/${user.avatar}`
         : (user.avatarUrl || '')
 
       return reply.send({
@@ -105,9 +107,11 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       )
 
       // Construct avatar URL
-      const pbUrl = process.env.POCKETBASE_URL || 'http://localhost:8090'
+      // PocketBase v0.26+: auth collections store files under _pb_users_auth_ path
+      // Use public URL for file serving (via Nginx proxy)
+      const pbUrl = process.env.POCKETBASE_FILES_URL || process.env.POCKETBASE_URL || 'http://localhost:8090'
       const avatarFullUrl = user.avatar
-        ? `${pbUrl}/api/files/users/${user.id}/${user.avatar}`
+        ? `${pbUrl}/api/files/_pb_users_auth_/${user.id}/${user.avatar}`
         : (user.avatarUrl || '')
 
       return reply.send({
